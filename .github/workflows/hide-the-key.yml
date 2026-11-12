@@ -1,0 +1,34 @@
+name: HideTheKey Security Audit
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  secret-scan:
+    name: Audit API Keys & .gitignore Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run HideTheKey Secret Audit
+        run: |
+          # If HideTheKey is cloned/vendored or run via python
+          if [ -f "bin/hide-the-key" ]; then
+            ./bin/hide-the-key --ci
+          else
+            # Install & run directly from repository
+            python3 -m pip install -q git+https://github.com/Rhara/Hide-the-key.git || true
+            python3 -m hide_the_key.cli --ci
+          fi

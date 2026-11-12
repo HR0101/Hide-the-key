@@ -35,7 +35,47 @@ DEFAULT_IGNORE_DIRS = {
     ".hg",
 }
 
-# Maximum file size to scan for content secrets (e.g. 5 MB)
+# Directories to skip when scanning the entire home/system directory
+GLOBAL_SCAN_IGNORE_DIRS = {
+    # System / OS
+    "Library",
+    "System",
+    "Applications",
+    "Public",
+    ".Trash",
+    # Package & cache stores
+    ".npm",
+    ".yarn",
+    ".pnpm-store",
+    ".cargo",
+    ".rustup",
+    ".gem",
+    ".bundle",
+    ".cache",
+    ".cocoapods",
+    ".gradle",
+    ".m2",
+    ".nuget",
+    ".local/share/Trash",
+    # Virtual machines & containers
+    ".docker",
+    ".orbstack",
+    "VirtualBox VMs",
+    # IDE & Browser caches
+    ".vscode/extensions",
+    # Common big project artifacts
+    "node_modules",
+    "venv",
+    ".venv",
+    "vendor",
+    "target",
+    "dist",
+    "build",
+    "Pods",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+}
 MAX_SCAN_FILE_SIZE = 5 * 1024 * 1024
 
 # Files that should be protected and typically ignored by .gitignore

@@ -113,6 +113,7 @@ def scan_directory(
     target_dir: str,
     check_staged: bool = True,
     check_history: bool = False,
+    shallow_only: bool = False,
     custom_ignore_dirs: Optional[Set[str]] = None,
 ) -> ScanSummary:
     """
@@ -137,8 +138,14 @@ def scan_directory(
 
     # 1. Walk through the directory tree
     for root, dirs, files in os.walk(target_dir):
+        if shallow_only and root != target_dir:
+            dirs.clear()
+            continue
+
         # Prune ignored directories
         dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".git")]
+        if shallow_only:
+            dirs.clear()
 
         for fname in files:
             full_path = os.path.join(root, fname)
