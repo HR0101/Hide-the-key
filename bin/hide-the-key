@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# HideTheKey CLI entrypoint
+
+set -e
+
+# Resolve script directory (handles symlinks)
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+PROJECT_ROOT="$( cd -P "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd )"
+
+# Run with python3
+export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
+exec python3 -m hide_the_key.cli "$@"
