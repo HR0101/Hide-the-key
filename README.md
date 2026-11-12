@@ -78,7 +78,30 @@
 
 ---
 
-## 🛡️ 検出・監査対象
+## 🥊 既存ツールとの比較・圧倒的な差別化ポイント
+
+世の中には `Gitleaks`, `TruffleHog`, `GitGuardian (ggshield)` などのシークレットスキャナーが存在しますが、**HideTheKey は既存ツールの最大の弱点である「.gitignoreカバレッジの盲点」「導入の面倒さ」「マシン全体の把握難」を完全に解消**しています。
+
+| 比較項目 | **HideTheKey** (本ツール) | **Gitleaks** | **TruffleHog** | **GitGuardian** |
+| :--- | :---: | :---: | :---: | :---: |
+| **`.gitignore` カバレッジ監査** | **◎ (.envの除外漏れを未然検知)** | ✕ (コミット差分のみ) | ✕ (コミット差分のみ) | ✕ (コミット差分のみ) |
+| **ワンコマンド自動修復 (`--fix`)** | **◎ (.gitignore追記 & rm --cached)** | ✕ (検出のみ) | ✕ (検出のみ) | ✕ (検出のみ) |
+| **パソコン全体 (100+リポジトリ) 監査** | **◎ (全リポジトリ自動発見 & 集計)** | ✕ (1リポジトリ単位) | ✕ (1リポジトリ単位) | ✕ (個別設定) |
+| **外部依存 / アカウント登録** | **ゼロ (macOS標準Python3のみ)** | △ (Goバイナリの導入要) | △ (Goバイナリの導入要) | ✕ (SaaS登録 & APIキー必須) |
+| **Mac GUI & インタラクティブHTML** | **◎ (.command + ブラウザHTML)** | ✕ (CUIテキストのみ) | ✕ (CUIテキストのみ) | △ (SaaS画面) |
+| **Git pre-commit ワンタッチ導入** | **◎ (`--install-hook` で1秒)** | △ (手動スクリプト作成) | △ (手動設定要) | ○ (`ggshield install`) |
+| **GitHub Actions PR インライン警告** | **◎ (`::error` でFiles changedに表示)** | ○ (設定が必要) | ○ (設定が必要) | ○ |
+| **AIエージェント (Skill) ネイティブ対応**| **◎ (`SKILL.md` 完備)** | ✕ (人間向けのみ) | ✕ (人間向けのみ) | ✕ (人間向けのみ) |
+
+### HideTheKey ならではのコア強み：
+1. **「差分スキャン」だけでなく「.gitignore 漏れ」を水際で防ぐ**:  
+   Gitleaks等は「すでにコミットされたテキスト」しか見ません。HideTheKeyは「まだコミットしていないがローカルにある `.env` が `.gitignore` に書かれていない（次の `git add .` で誤って上がってしまう）」状態を警告・自動修正します。
+2. **完全ローカル完結＆ゼロ依存**:  
+   SaaSにコードやシークレットを送信するリスクが一切なく、追加の `pip install` や Go バイナリも不要。
+3. **AI コーディングエージェントの安全装置 (Skill)**:  
+   Antigravity, Claude Code, Gemini CLI などのAIがコードを生成・編集した後、自律的に安全点検を行い、問題があれば自動修正してからプッシュする「AI時代のためのガードレール」として機能します。
+
+---
 
 ### 1. 機密設定・シークレットファイル
 - `.env`, `.env.local`, `.env.development`, `.env.production` など
@@ -117,23 +140,24 @@
 
 ---
 
-## 🛠️ Git pre-commit hook への組み込み例
+## 🤖 CI/CD・Gitフック・AIエージェントへの組み込み
 
-コミット直前に自動チェックし、シークレットが含まれている場合はコミットを自動中断（ブロック）できます。
-
-`.git/hooks/pre-commit` に以下を記述：
+### 1. Git pre-commit フックのワンタッチ導入
+現在のプロジェクトでコミット時に自動スキャンし、シークレットがあればコミットをブロックします：
 ```bash
-#!/usr/bin/env bash
-if ! hide-the-key --no-safe; then
-    echo "❌ Commit aborted: Sensitive secrets detected!"
-    exit 1
-fi
+hide-the-key --install-hook
 ```
 
-実行権限を付与：
+### 2. GitHub Actions ワークフローの一発生成
+リポジトリに `.github/workflows/hide-the-key.yml` を自動生成します：
 ```bash
-chmod +x .git/hooks/pre-commit
+hide-the-key --init-ci
 ```
+PR作成時やプッシュ時にCIが走り、GitHub の PR 画面（Files changed）上にインラインで直接赤く警告（Annotation）が表示されます。
+
+### 3. AIエージェント（Antigravity / Claude Code）の Skill として利用
+本リポジトリには [skills/hide-the-key/SKILL.md](skills/hide-the-key/SKILL.md) が同梱されています。  
+AIエージェントに「コミット前に hide-the-key でシークレットと .gitignore をチェックして」と指示するだけで、自律的に安全点検＆修正を行わせることができます。
 
 ---
 
