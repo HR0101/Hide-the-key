@@ -1,6 +1,7 @@
-# 🗝️ HideTheKey (`hide-the-key`)
+# HideTheKey (`hide-the-key`)
 
-> **GitHubへのAPIキー・機密ファイルの誤プッシュを未然に防ぐ、高速・高精度なセキュリティ監査CLI＆GUIランチャーツール**
+GitHubへのAPIキー、秘密鍵、機密設定ファイルの漏洩を未然に防止するセキュリティ監査ツール。  
+ローカル環境における `.gitignore` カバレッジ検証、静的コード解析、および CI/CD パイプライン連携に対応。
 
 [![macOS supported](https://img.shields.io/badge/macOS-Supported-brightgreen.svg)]()
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Standard%20Python3%20Only-blue.svg)]()
@@ -8,180 +9,189 @@
 
 ---
 
-## 📌 概要
+## 1. 概要
 
-`HideTheKey` は、指定したディレクトリやGitリポジトリを瞬時にスキャンし、以下を自動点検・保護するツールです：
+HideTheKey は、Gitリポジトリおよびローカルファイルシステムを走査し、機密情報の混入や不適切な構成管理を検出・修正するセキュリティ監査エンジンである。  
+従来のシークレットスキャナーが検知対象外としていた「コミット前の `.gitignore` 除外漏れ」を水際で捕捉するとともに、外部ライブラリに依存しないゼロディペンデンシー設計（macOS/Linux標準の Python 3 および Git のみ）を採用している。
 
-1. **機密ファイルの検知 & `.gitignore` カバレッジ検査**
-   - `.env`, `.env.production`, `*.pem`, `*.key`, `serviceAccountKey*.json` などの機密ファイルが存在するか。
-   - それらが `.gitignore` でしっかりと除外されているか。
-   - **すでに Git のステージングやコミットで追跡対象になってしまっていないか**（最重要）。
-2. **コード内にハードコードされた API キー・シークレットの検出**
-   - OpenAI, Anthropic (Claude), Google Gemini, AWS, GitHub PAT, Slack, Stripe, Discord, HuggingFace, 秘密鍵 などの主要サービスキーをコードから自動検出。
-   - 画面出力時はキーの中央部を自動マスク（`sk-proj-abc...****...xyz`）し、端末や画面共有時の安全を確保。
-3. **GitHubに上げるべきでない不要・危険ファイルの検出**
-   - `.DS_Store`（Macのメタ情報）、SQLiteデータベース（`*.sqlite3`, `*.db`）、DBダンプファイルなど。
-4. **過去のコミット履歴の検査 (`--history`)**
-   - 過去のコミットで誤って `.env` や鍵を上げてしまっていないかを履歴から追跡。
-5. **ワンクリック/ワンコマンド自動修正 (`--fix`)**
-   - 見落としていた機密ファイルを `.gitignore` に自動追加。
-   - すでにインデックスに追加されていた場合は `git rm --cached` で追跡を解除。
+### 主要機能
+1. **機密設定ファイルの検出および `.gitignore` カバレッジ監査**  
+   `.env`, `credentials.json`, `*.pem`, `*.key` 等の存在を走査し、Git管理対象（Tracked/Staged）に含まれていないか、および `.gitignore` に明示的に定義されているかを判定。
+2. **静的コード解析による認証情報およびトークン検出**  
+   OpenAI, Anthropic, Google Gemini, AWS, GitHub, Stripe 等の主要クラウドプロバイダ固有のトークン構造、および高エントロピー文字列を検出。
+3. **危険なコード参照パターンの検出**  
+   フロントエンド環境変数（`NEXT_PUBLIC_`, `VITE_` 等）によるブラウザへの秘密鍵露出、環境変数取得時のフォールバック値への直接記述、ログ出力へのトークン受け渡しを検出。
+4. **履歴走査および不要ファイル監査**  
+   過去のコミット履歴（`--history`）の監査、および `.DS_Store` や SQLite データベースファイル等のリポジトリ混入防止。
+5. **自動修復機能 (`--fix`)**  
+   未登録ファイルの `.gitignore` への自動追記、およびインデックス登録済みファイルに対する `git rm --cached` の安全な適用。
 
 ---
 
-## 🚀 3つの使い方
+## 2. 既存ツールとの比較および技術的優位性
 
-### ① Mac Finder からダブルクリックで使う (`.command`)
-ターミナルコマンドが苦手な場合や、素早くフォルダを点検したい場合に最適です。
+| 評価項目 | HideTheKey | Gitleaks | TruffleHog | GitGuardian |
+| :--- | :---: | :---: | :---: | :---: |
+| **`.gitignore` カバレッジ監査** | **対応** (未コミット時の除外漏れを防止) | 非対応 (コミット差分のみ) | 非対応 (コミット差分のみ) | 非対応 (コミット差分のみ) |
+| **自動修復機能 (`--fix`)** | **対応** (`.gitignore` 追記・インデックス除外) | 非対応 | 非対応 | 非対応 |
+| **マルチリポジトリ横断監査** | **対応** (PC内リポジトリ自動発見・集計) | 非対応 (単一リポジトリ単位) | 非対応 (単一リポジトリ単位) | 非対応 |
+| **外部依存性** | **不要** (標準Python 3およびGitのみ) | 要バイナリ導入 (Go) | 要バイナリ導入 (Go) | 要アカウント登録・APIキー発行 |
+| **スタンドアローン HTML レポート** | **標準装備** (外部通信不要) | 非対応 | 非対応 | Webダッシュボード連携 |
+| **Git pre-commit フック導入** | **単一コマンドで生成** (`--install-hook`) | 手動構成が必要 | 手動構成が必要 | 導入コマンドあり |
+| **GitHub Actions / SARIF 連携** | **対応** (Code Scanning / PRアノテーション) | 対応 | 対応 | 対応 |
+| **AIエージェント向け Skill 統合** | **対応** (`SKILL.md` 付属) | 非対応 | 非対応 | 非対応 |
 
-1. `hide-the-key.command` を Finder でダブルクリックします。
-2. ターミナルウィンドウが立ち上がり、**「点検したいフォルダをドラッグ＆ドロップ（またはEnterで現在のフォルダ）」** と聞かれます。
-3. フォルダをウィンドウ内にドラッグ＆ドロップして `Enter` を押すだけで、瞬時に診断結果が表示されます。
-4. 未登録の `.env` がある場合、その場で `y` を押せば `.gitignore` への自動追加も完了します。
+### 技術的特徴
+- **水際対策の徹底**: コミット差分のみを検査する既存ツールに対し、ローカル環境の未追跡ファイルが意図せず `git add .` 等でコミットされるリスクを構造的に排除する。
+- **データローカリティの保証**: コードやトークンを外部サーバーへ送信せず、完全にローカル環境内で解析を完結させる。
 
 ---
 
-### ② ターミナルから CLI ツールとして使う
-プロジェクト直下から直接コマンドを実行できます。
+## 3. 検出仕様
 
+### 3.1 機密設定ファイル
+- 環境変数定義ファイル: `.env`, `.env.local`, `.env.production` 等
+- 秘密鍵および証明書: `id_rsa`, `id_ed25519`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.pkcs12`, `*.keystore`
+- サービスアカウントおよび認証ファイル: `serviceAccountKey*.json`, `client_secret*.json`, `credentials.json`, `firebase*.json`
+- ネットワークおよび認証情報: `.netrc`, `.htpasswd`  
+*※ `.env.example`, `.env.sample`, `*.template` 等の公開前提ファイルは自動識別により除外される。*
+
+### 3.2 認証トークンおよび API キー
+- **OpenAI**: `sk-[a-zA-Z0-9]{48}`, `sk-proj-[a-zA-Z0-9_\-]{20,}`, `sk-admin-...`
+- **Anthropic Claude**: `sk-ant-(?:api03|admin01)-[a-zA-Z0-9_\-]{32,}`
+- **Google / Gemini**: `AIzaSy[0-9A-Za-z_\-]{33}`
+- **AWS**: `(AKIA|ASIA|ABIA|ACCA)[0-9A-Z]{16}` (Access Key ID)
+- **GitHub**: `ghp_...` (Personal Access Token), `github_pat_...` (Fine-grained), `gho_...`, `ghs_...`
+- **Slack**: `xoxb-...`, `xoxp-...`, Webhook URL
+- **Stripe**: `sk_live_...`, `rk_live_...`
+- **その他**: Discord Bot Token, Telegram Bot Token, HuggingFace Token (`hf_...`), Groq, Resend, Supabase, SendGrid, Twilio, NPM/PyPI トークン, RSA/EC 秘密鍵ヘッダーブロック
+
+### 3.3 危険なコード参照パターン (Code Patterns)
+- **公開環境変数への秘密鍵代入**: `NEXT_PUBLIC_`, `VITE_`, `REACT_APP_` 等のプレフィックスを伴う秘密情報参照（ブラウザのJavaScriptバンドルへの混入防止）。
+- **環境変数フォールバックへの直書き**: `process.env.KEY || "raw_secret"` や `os.getenv("KEY", "raw_secret")` 等のデフォルト値混入。
+- **URL内への直接埋め込み**: URLクエリパラメータ (`?key=...`) または Basic 認証形式 (`https://user:token@host`) によるクレデンシャル露出。
+- **ログ出力へのトークン受け渡し**: `console.log(process.env.KEY)` や `print(secret_key)` 等の出力処理。
+- **コンテナ定義内の平文指定**: Dockerfile の `ENV` や `ARG` 命令における秘密鍵指定。
+
+### 3.4 リポジトリ混入不適格ファイル
+- macOS 固有メタデータ: `.DS_Store`, `.AppleDouble`
+- データベースファイル: `*.sqlite`, `*.sqlite3`, `*.db`, `*.sql.gz`, `*.dump`
+
+---
+
+## 4. 判定基準 (Severity Levels)
+
+| レベル | 状態 | 影響および対策 |
+| :--- | :--- | :--- |
+| **CRITICAL** | Git追跡中 / ステージング中 | 既にGit管理下にあり、プッシュ時にGitHubへ漏洩する状態。`git rm --cached` の実行およびキーの即時失効・再発行が必要。 |
+| **HIGH** | 未追跡かつ `.gitignore` 未除外 | 機密ファイルが存在するが除外設定が欠如している状態。`--fix` による `.gitignore` への追記が必要。 |
+| **MEDIUM** | Git管理外ディレクトリでの検知 | Git非管理フォルダ内に存在する機密情報。将来的なリポジトリ化の際に注意を要する。 |
+| **LOW** | 除外設定済みファイル内のキー | ファイル自体は `.gitignore` で保護されているが、平文キーが含まれる状態。 |
+| **SAFE** | 保護完了 | 機密ファイルが存在するが、`.gitignore` のルールにより安全に除外されている状態。 |
+
+---
+
+## 5. 使用方法
+
+### 5.1 CLI による実行
 ```bash
-# カレントディレクトリをスキャン
+# カレントディレクトリの監査
 ./bin/hide-the-key
 
-# 特定のプロジェクトディレクトリを指定してスキャン
-./bin/hide-the-key ~/my-web-app
+# 対象ディレクトリを指定した監査
+./bin/hide-the-key /path/to/project
 
-# 開発フォルダ配下の全Gitリポジトリを一括スキャン
-./bin/hide-the-key ~/Projects --all
+# パソコン全体（ホームディレクトリ配下の全リポジトリ）の横断監査
+./bin/hide-the-key --global
 
-# 過去のコミット履歴も含めて漏洩を点検
+# コミット履歴を含めた全量監査
 ./bin/hide-the-key --history
 
-# 未登録のシークレットを自動で .gitignore に追加・追跡解除
+# 未登録シークレットの自動除外およびキャッシュ解除
 ./bin/hide-the-key --fix
 
-# CI/CD パイプライン連携用の JSON 出力
+# 機械可読形式での出力 (CI/CD 連携用)
 ./bin/hide-the-key --json
+
+# SARIF v2.1.0 形式での出力 (GitHub Code Scanning 連携用)
+./bin/hide-the-key --sarif results.sarif
 ```
 
----
-
-### ③ グローバルコマンドとしてインストールする (`install.sh`)
-どのディレクトリからでも `hide-the-key` と打つだけで実行できるようにします。
-
+### 5.2 システムへのインストール
 ```bash
 ./install.sh
 ```
+`~/.local/bin/hide-the-key` にシンボリックリンクが生成され、任意のパスから実行可能となる。
 
-`~/.local/bin/hide-the-key` にシンボリックリンクが作成されます。  
-（`~/.zshrc` などに `export PATH="$HOME/.local/bin:$PATH"` が追加されていれば、どこからでも `hide-the-key` が呼べるようになります）
-
----
-
-## 🥊 既存ツールとの比較・圧倒的な差別化ポイント
-
-世の中には `Gitleaks`, `TruffleHog`, `GitGuardian (ggshield)` などのシークレットスキャナーが存在しますが、**HideTheKey は既存ツールの最大の弱点である「.gitignoreカバレッジの盲点」「導入の面倒さ」「マシン全体の把握難」を完全に解消**しています。
-
-| 比較項目 | **HideTheKey** (本ツール) | **Gitleaks** | **TruffleHog** | **GitGuardian** |
-| :--- | :---: | :---: | :---: | :---: |
-| **`.gitignore` カバレッジ監査** | **◎ (.envの除外漏れを未然検知)** | ✕ (コミット差分のみ) | ✕ (コミット差分のみ) | ✕ (コミット差分のみ) |
-| **ワンコマンド自動修復 (`--fix`)** | **◎ (.gitignore追記 & rm --cached)** | ✕ (検出のみ) | ✕ (検出のみ) | ✕ (検出のみ) |
-| **パソコン全体 (100+リポジトリ) 監査** | **◎ (全リポジトリ自動発見 & 集計)** | ✕ (1リポジトリ単位) | ✕ (1リポジトリ単位) | ✕ (個別設定) |
-| **外部依存 / アカウント登録** | **ゼロ (macOS標準Python3のみ)** | △ (Goバイナリの導入要) | △ (Goバイナリの導入要) | ✕ (SaaS登録 & APIキー必須) |
-| **Mac GUI & インタラクティブHTML** | **◎ (.command + ブラウザHTML)** | ✕ (CUIテキストのみ) | ✕ (CUIテキストのみ) | △ (SaaS画面) |
-| **Git pre-commit ワンタッチ導入** | **◎ (`--install-hook` で1秒)** | △ (手動スクリプト作成) | △ (手動設定要) | ○ (`ggshield install`) |
-| **GitHub Actions PR インライン警告** | **◎ (`::error` でFiles changedに表示)** | ○ (設定が必要) | ○ (設定が必要) | ○ |
-| **AIエージェント (Skill) ネイティブ対応**| **◎ (`SKILL.md` 完備)** | ✕ (人間向けのみ) | ✕ (人間向けのみ) | ✕ (人間向けのみ) |
-
-### HideTheKey ならではのコア強み：
-1. **「差分スキャン」だけでなく「.gitignore 漏れ」を水際で防ぐ**:  
-   Gitleaks等は「すでにコミットされたテキスト」しか見ません。HideTheKeyは「まだコミットしていないがローカルにある `.env` が `.gitignore` に書かれていない（次の `git add .` で誤って上がってしまう）」状態を警告・自動修正します。
-2. **完全ローカル完結＆ゼロ依存**:  
-   SaaSにコードやシークレットを送信するリスクが一切なく、追加の `pip install` や Go バイナリも不要。
-3. **AI コーディングエージェントの安全装置 (Skill)**:  
-   Antigravity, Claude Code, Gemini CLI などのAIがコードを生成・編集した後、自律的に安全点検を行い、問題があれば自動修正してからプッシュする「AI時代のためのガードレール」として機能します。
+### 5.3 macOS GUI ランチャー
+`hide-the-key.command` を実行することで、対話型ターミナルが起動する。ドラッグ＆ドロップによるフォルダ指定スキャン、またはホームディレクトリ全体の監査を選択可能。
 
 ---
 
-### 1. 機密設定・シークレットファイル
-- `.env`, `.env.local`, `.env.development`, `.env.production` など
-- `id_rsa`, `id_ed25519`, `id_ecdsa` (SSH秘密鍵)
-- `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.pkcs12`, `*.keystore`
-- `serviceAccountKey*.json`, `client_secret*.json`, `credentials.json`, `firebase*.json`
-- `.netrc`, `.htpasswd`
-- ※ `.env.example`, `.env.sample`, `*.template` などの安全なテンプレートファイルは自動判定して除外します。
+## 6. パイプラインおよび開発環境連携
 
-### 2. コード内のハードコードされた API キー / トークン
-- **OpenAI**: `sk-...`, `sk-proj-...`, `sk-admin-...`
-- **Anthropic Claude**: `sk-ant-api03-...`, `sk-ant-admin01-...`
-- **Google / Gemini**: `AIzaSy...`
-- **AWS**: `AKIA...`, `ASIA...` (Access Key ID)
-- **GitHub**: `ghp_...` (PAT), `github_pat_...` (Fine-grained), `gho_...`, `ghs_...`
-- **Slack**: `xoxb-...`, `xoxp-...`, Webhook URL
-- **Stripe**: `sk_live_...`, `rk_live_...`
-- **その他**: Discord Bot, Telegram Bot, HuggingFace (`hf_...`), Groq, Resend, Supabase, SendGrid, Twilio, NPM/PyPI トークン, RSA/EC 秘密鍵ヘッダー, 汎用APIキー代入式
-
-### 3. その他 GitHub に不要・危険なファイル
-- `.DS_Store` (Macのフォルダ属性メタデータ)
-- `*.sqlite`, `*.sqlite3`, `*.db` (ローカルDB)
-- `*.sql.gz`, `*.dump` (データベースダンプ)
-
----
-
-## 🚦 判定レベル（Severity）
-
-| レベル | アイコン | 状態 | 影響と対策 |
-| :--- | :---: | :--- | :--- |
-| **CRITICAL** | 🚨 | **Git 追跡中 / ステージング中** | **すでに GitHub に上がる状態です！** `git rm --cached` を実行し、キーをローテーションしてください。 |
-| **HIGH** | ⚠️ | **未登録の機密ファイル** | `.env` 等が存在しますが `.gitignore` にありません。`git add .` で誤って上がります。`--fix` で除外してください。 |
-| **MEDIUM** | ⚡ | **Git管理外の機密情報** | Gitリポジトリ外のファイルにキーが存在します。リポジトリ化の際に注意が必要です。 |
-| **LOW** | ℹ️ | **gitignore除外済みコード内のキー** | ファイル自体は除外されていますが、コード内に平文キーが存在します。 |
-| **SAFE** | ✅ | **保護済み** | 機密ファイルが存在しますが、`.gitignore` のルールにより安全に除外されています。 |
-
----
-
-## 🤖 CI/CD・Gitフック・AIエージェントへの組み込み
-
-### 1. Git pre-commit フックのワンタッチ導入
-現在のプロジェクトでコミット時に自動スキャンし、シークレットがあればコミットをブロックします：
+### 6.1 Git pre-commit フックの導入
+コミット実行時に自動検証を行い、違反が検出された場合にコミット処理を中止する。
 ```bash
 hide-the-key --install-hook
 ```
+対象リポジトリの `.git/hooks/pre-commit` が自動生成される。
 
-### 2. GitHub Actions ワークフローの一発生成
-リポジトリに `.github/workflows/hide-the-key.yml` を自動生成します：
+### 6.2 GitHub Actions 連携
+リポジトリのルートで以下のコマンドを実行し、ワークフロー定義を生成する。
 ```bash
 hide-the-key --init-ci
 ```
-PR作成時やプッシュ時にCIが走り、GitHub の PR 画面（Files changed）上にインラインで直接赤く警告（Annotation）が表示されます。
+生成される定義ファイル (`.github/workflows/hide-the-key.yml`) により、以下のイベントが自動監査される：
+- 全ブランチおよびタグへのプッシュ
+- Pull Request（変更行へのインラインアノテーション出力）
+- 深夜定期実行（Cronスケジュールによるコミット履歴監査）
+- 手動トリガー (`workflow_dispatch`)
+- GitHub Security タブ（Code scanning alerts）への SARIF アップロード
 
-### 3. AIエージェント（Antigravity / Claude Code）の Skill として利用
-本リポジトリには [skills/hide-the-key/SKILL.md](skills/hide-the-key/SKILL.md) が同梱されています。  
-AIエージェントに「コミット前に hide-the-key でシークレットと .gitignore をチェックして」と指示するだけで、自律的に安全点検＆修正を行わせることができます。
+### 6.3 GitLab CI 連携
+```bash
+hide-the-key --init-gitlab
+```
+`.gitlab-ci.yml` が生成され、GitLab の Secret Detection レポートと統合される。
+
+### 6.4 AI エージェント向け Skill 統合
+本リポジトリには `skills/hide-the-key/SKILL.md` が同梱されている。  
+Antigravity, Claude Code, Gemini CLI 等の自律エージェントにおいて、コード変更完了後かつプッシュ前のゲートキーパーとして呼び出し可能である。
 
 ---
 
-## ⚙️ コマンドライン引数一覧
+## 7. コマンドライン引数リファレンス
 
 ```
-usage: hide-the-key [-h] [--all] [--history] [--fix] [--json] [--no-safe] [--interactive] [path]
+usage: hide-the-key [-h] [--global] [--root ROOT] [--history] [--fix] [--json]
+                    [--ci] [--sarif FILE] [--install-hook] [--init-ci]
+                    [--init-gitlab] [--html [HTML]] [--no-open] [--interactive]
+                    [path]
 
 positional arguments:
-  path           スキャン対象ディレクトリのパス (省略時はカレントディレクトリ)
+  path                  スキャン対象のパス（省略時はカレントリポジトリまたはホームディレクトリ）
 
 options:
-  -h, --help     ヘルプメッセージを表示
-  --all          指定ディレクトリ配下のすべてのGitリポジトリを再帰的にスキャン
-  --history      直近のGitコミット履歴を走査し、過去にコミットされた機密ファイルを検出
-  --fix          未除外の機密ファイルを .gitignore に自動追加し、キャッシュを解除
-  --json         結果を JSON 形式で標準出力 (CI/CD連携用)
-  --no-safe      安全に除外されている (.gitignore済み) ファイルの表示を省略
-  --interactive  対話モードで実行 (Finderからのドラッグ＆ドロップ対応)
+  -h, --help            ヘルプメッセージを表示して終了
+  --global, -g          ホームディレクトリ配下の全リポジトリを横断スキャン
+  --root ROOT           グローバルスキャンの起点ディレクトリを指定（デフォルト: '~'）
+  --history             Gitコミット履歴を走査し過去の機密混入を検査
+  --fix                 未除外の機密ファイルを .gitignore に追記しインデックスから解除
+  --json                解析結果を JSON 形式で出力
+  --ci                  CI実行モード（GitHub Actions 向けアノテーションおよびサマリー出力）
+  --sarif FILE          解析結果を SARIF v2.1.0 形式で出力
+  --install-hook        対象リポジトリに Git pre-commit フックをインストール
+  --init-ci             GitHub Actions ワークフロー定義ファイルを生成
+  --init-gitlab         GitLab CI パイプライン定義ファイルを生成
+  --html [HTML]         スタンドアローン HTML レポートを生成（デフォルト: hide-the-key-report.html）
+  --no-open             HTML レポート生成後のブラウザ自動起動を抑止
+  --interactive         対話型プロンプトモードで実行
 ```
 
 ---
 
-## 🧪 テストの実行
+## 8. テスト
 
 ```bash
 python3 -m unittest discover -s tests
@@ -189,6 +199,6 @@ python3 -m unittest discover -s tests
 
 ---
 
-## 📄 ライセンス
+## 9. ライセンス
 
-MIT License
+本ソフトウェアは MIT License の下で公開されている。詳細は [LICENSE](LICENSE) ファイルを参照のこと。
