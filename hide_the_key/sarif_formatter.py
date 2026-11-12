@@ -100,7 +100,7 @@ def export_sarif(summary: ScanSummary, output_path: str) -> str:
                     "driver": {
                         "name": "HideTheKey",
                         "version": "1.0.0",
-                        "informationUri": "https://github.com/Rhara/Hide-the-key",
+                        "informationUri": "https://github.com/HR0101/Hide-the-key",
                         "rules": rules,
                     }
                 },

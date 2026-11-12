@@ -179,7 +179,7 @@ jobs:
           if [ -f "bin/hide-the-key" ]; then
             ./bin/hide-the-key --ci --sarif results.sarif $HISTORY_FLAG
           else
-            python3 -m pip install -q git+https://github.com/Rhara/Hide-the-key.git || true
+            python3 -m pip install -q git+https://github.com/HR0101/Hide-the-key.git || true
             python3 -m hide_the_key.cli --ci --sarif results.sarif $HISTORY_FLAG
           fi
 
@@ -210,7 +210,7 @@ secret_audit:
   before_script:
     - apt-get update && apt-get install -y git
   script:
-    - python3 -m pip install -q git+https://github.com/Rhara/Hide-the-key.git || true
+    - python3 -m pip install -q git+https://github.com/HR0101/Hide-the-key.git || true
     - python3 -m hide_the_key.cli --ci --json > hide-the-key-report.json
   artifacts:
     when: always
