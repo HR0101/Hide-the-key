@@ -18,6 +18,8 @@ from hide_the_key.git_checker import (
 )
 from hide_the_key.scanner import scan_directory
 from hide_the_key.fix import add_to_gitignore, untrack_file
+from hide_the_key.sarif_formatter import export_sarif
+import json
 
 
 class TestSecretDetector(unittest.TestCase):
@@ -175,6 +177,21 @@ class TestGitScanner(unittest.TestCase):
         history_leaks = [i for i in summary.issues if i.issue_type == "GIT_HISTORY_LEAK"]
         self.assertGreaterEqual(len(history_leaks), 1)
         self.assertIn(".env.production", history_leaks[0].file_path)
+
+    def test_sarif_export(self):
+        env_file = os.path.join(self.test_dir, ".env")
+        with open(env_file, "w") as f:
+            f.write("SECRET=123\n")
+        summary = scan_directory(self.test_dir)
+        sarif_out = os.path.join(self.test_dir, "test.sarif")
+        export_sarif(summary, sarif_out)
+
+        self.assertTrue(os.path.exists(sarif_out))
+        with open(sarif_out, "r") as f:
+            data = json.load(f)
+        self.assertEqual(data["version"], "2.1.0")
+        self.assertEqual(data["runs"][0]["tool"]["driver"]["name"], "HideTheKey")
+        self.assertGreaterEqual(len(data["runs"][0]["results"]), 1)
 
 
 if __name__ == "__main__":

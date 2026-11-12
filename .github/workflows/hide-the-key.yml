@@ -1,14 +1,29 @@
-name: HideTheKey Security Audit
+name: HideTheKey Security & Secret Audit
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ "**" ]
+    tags: [ "**" ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ "**" ]
+  schedule:
+    # Nightly audit at 03:00 UTC (inspects full repository + history)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      check_history:
+        description: 'Audit git commit history for past leaks'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
-  secret-scan:
-    name: Audit API Keys & .gitignore Coverage
+  audit-secrets:
+    name: Security & .gitignore Audit
     runs-on: ubuntu-latest
 
     steps:
@@ -22,13 +37,23 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Run HideTheKey Secret Audit
+      - name: Run HideTheKey Security Audit
         run: |
-          # If HideTheKey is cloned/vendored or run via python
-          if [ -f "bin/hide-the-key" ]; then
-            ./bin/hide-the-key --ci
-          else
-            # Install & run directly from repository
-            python3 -m pip install -q git+https://github.com/Rhara/Hide-the-key.git || true
-            python3 -m hide_the_key.cli --ci
+          HISTORY_FLAG=""
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.check_history }}" = "true" ]; then
+            HISTORY_FLAG="--history"
           fi
+
+          if [ -f "bin/hide-the-key" ]; then
+            ./bin/hide-the-key --ci --sarif results.sarif $HISTORY_FLAG
+          else
+            python3 -m pip install -q git+https://github.com/Rhara/Hide-the-key.git || true
+            python3 -m hide_the_key.cli --ci --sarif results.sarif $HISTORY_FLAG
+          fi
+
+      - name: Upload SARIF to GitHub Code Scanning Alerts
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('results.sarif') != ''
+        with:
+          sarif_file: results.sarif
+          category: hide-the-key

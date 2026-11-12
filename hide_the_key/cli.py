@@ -11,7 +11,9 @@ from .ci_formatter import (
     write_github_step_summary,
     install_git_hook,
     init_github_workflow,
+    init_gitlab_ci,
 )
+from .sarif_formatter import export_sarif
 from .scanner import scan_directory, ScanSummary
 from .global_scanner import run_global_scan, GlobalScanResult
 from .reporter import print_banner, render_report, render_json, Colors
@@ -152,6 +154,16 @@ def main():
         help="Generate a GitHub Actions workflow (.github/workflows/hide-the-key.yml).",
     )
     parser.add_argument(
+        "--sarif",
+        metavar="FILE",
+        help="Export findings in SARIF v2.1.0 format for GitHub Code Scanning / Security Alerts.",
+    )
+    parser.add_argument(
+        "--init-gitlab",
+        action="store_true",
+        help="Generate a GitLab CI configuration (.gitlab-ci.yml).",
+    )
+    parser.add_argument(
         "--html",
         nargs="?",
         const="hide-the-key-report.html",
@@ -184,6 +196,12 @@ def main():
         path = init_github_workflow(repo_root)
         print(f"{c.GREEN}✅ Successfully created GitHub Actions workflow:{c.RESET} {path}")
         print("Commit and push this file to GitHub to enable automatic PR & push security audits.")
+        sys.exit(0)
+
+    if args.init_gitlab:
+        repo_root = os.getcwd()
+        path = init_gitlab_ci(repo_root)
+        print(f"{c.GREEN}✅ Successfully created GitLab CI config:{c.RESET} {path}")
         sys.exit(0)
 
     # Interactive Mode (used by .command launcher)
@@ -279,6 +297,11 @@ def main():
     if args.ci or is_github_actions():
         emit_github_actions_annotations(summary)
         write_github_step_summary(summary)
+
+    if args.sarif:
+        export_sarif(summary, args.sarif)
+        if not args.ci and not args.json:
+            print(f"{c.GREEN}✅ Exported SARIF to:{c.RESET} {args.sarif}")
 
     if args.json:
         render_json(summary)

@@ -117,22 +117,45 @@ fi
 
 
 def init_github_workflow(repo_root: str) -> str:
-    """Generate .github/workflows/hide-the-key.yml for automated CI."""
+    """
+    Generate comprehensive .github/workflows/hide-the-key.yml
+    Supports:
+      - Push on all branches (direct pushes)
+      - Pull Requests
+      - Nightly scheduled cron audits (with commit history inspection)
+      - Manual trigger (workflow_dispatch)
+      - SARIF export to GitHub Security Code Scanning tab
+    """
     wf_dir = os.path.join(repo_root, ".github", "workflows")
     os.makedirs(wf_dir, exist_ok=True)
     wf_path = os.path.join(wf_dir, "hide-the-key.yml")
 
-    workflow_content = """name: HideTheKey Security Audit
+    workflow_content = """name: HideTheKey Security & Secret Audit
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ "**" ]
+    tags: [ "**" ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ "**" ]
+  schedule:
+    # Nightly audit at 03:00 UTC (inspects full repository + history)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      check_history:
+        description: 'Audit git commit history for past leaks'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
-  secret-scan:
-    name: Audit API Keys & .gitignore Coverage
+  audit-secrets:
+    name: Security & .gitignore Audit
     runs-on: ubuntu-latest
 
     steps:
@@ -146,18 +169,61 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Run HideTheKey Secret Audit
+      - name: Run HideTheKey Security Audit
         run: |
-          # If HideTheKey is cloned/vendored or run via python
-          if [ -f "bin/hide-the-key" ]; then
-            ./bin/hide-the-key --ci
-          else
-            # Install & run directly from repository
-            python3 -m pip install -q git+https://github.com/Rhara/Hide-the-key.git || true
-            python3 -m hide_the_key.cli --ci
+          HISTORY_FLAG=""
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.check_history }}" = "true" ]; then
+            HISTORY_FLAG="--history"
           fi
+
+          if [ -f "bin/hide-the-key" ]; then
+            ./bin/hide-the-key --ci --sarif results.sarif $HISTORY_FLAG
+          else
+            python3 -m pip install -q git+https://github.com/Rhara/Hide-the-key.git || true
+            python3 -m hide_the_key.cli --ci --sarif results.sarif $HISTORY_FLAG
+          fi
+
+      - name: Upload SARIF to GitHub Code Scanning Alerts
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('results.sarif') != ''
+        with:
+          sarif_file: results.sarif
+          category: hide-the-key
 """
     with open(wf_path, "w", encoding="utf-8") as f:
         f.write(workflow_content)
 
     return wf_path
+
+
+def init_gitlab_ci(repo_root: str) -> str:
+    """Generate .gitlab-ci.yml template for GitLab CI/CD pipelines."""
+    gl_path = os.path.join(repo_root, ".gitlab-ci.yml")
+    content = """# HideTheKey GitLab CI/CD Pipeline
+stages:
+  - test
+  - security
+
+secret_audit:
+  stage: security
+  image: python:3.12-slim
+  before_script:
+    - apt-get update && apt-get install -y git
+  script:
+    - python3 -m pip install -q git+https://github.com/Rhara/Hide-the-key.git || true
+    - python3 -m hide_the_key.cli --ci --json > hide-the-key-report.json
+  artifacts:
+    when: always
+    reports:
+      secret_detection: hide-the-key-report.json
+    paths:
+      - hide-the-key-report.json
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+"""
+    with open(gl_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return gl_path
+
