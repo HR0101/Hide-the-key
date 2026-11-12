@@ -17,7 +17,7 @@ from .sarif_formatter import export_sarif
 from .scanner import scan_directory, ScanSummary
 from .global_scanner import run_global_scan, GlobalScanResult
 from .reporter import print_banner, render_report, render_json, Colors
-from .html_reporter import generate_html_report
+from .html_reporter import generate_html_report, generate_html_report_for_single
 from .fix import add_to_gitignore, untrack_file
 
 c = Colors()
@@ -307,6 +307,15 @@ def main():
         render_json(summary)
     else:
         render_report(summary)
+
+    # Generate and open HTML report for single directory scan
+    if args.html and not args.json:
+        html_file = os.path.abspath(args.html)
+        generate_html_report_for_single(summary, html_file)
+        print(f"\n{c.GREEN}🌐 Interactive HTML report saved to:{c.RESET} {c.BOLD}{html_file}{c.RESET}")
+
+        if not args.no_open and (args.interactive or sys.stdout.isatty()):
+            open_file_in_browser(html_file)
 
     if args.fix:
         print("\n🔧 Applying automatic fixes...")

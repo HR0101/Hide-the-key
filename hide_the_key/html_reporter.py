@@ -265,3 +265,12 @@ def generate_html_report(result: GlobalScanResult, output_path: str) -> str:
         f.write(html_content)
 
     return output_path
+
+
+def generate_html_report_for_single(summary: ScanSummary, output_path: str) -> str:
+    """Generate HTML report for a single repository or directory scan."""
+    wrapper = GlobalScanResult(summary.target_dir)
+    wrapper.discovered_dirs = [summary.target_dir]
+    wrapper.summaries = [summary]
+    wrapper.total_scanned_files = summary.scanned_files_count
+    return generate_html_report(wrapper, output_path)
