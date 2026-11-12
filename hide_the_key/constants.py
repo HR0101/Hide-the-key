@@ -342,3 +342,66 @@ FALSE_POSITIVE_SUBSTRINGS = [
     "your-api-key",
     "insert-key-here",
 ]
+
+# Dangerous public environment variable prefixes (exposed to browser bundles)
+PUBLIC_ENV_PREFIXES = ("NEXT_PUBLIC_", "VITE_", "REACT_APP_", "NUXT_PUBLIC_", "EXPO_PUBLIC_", "PUBLIC_")
+
+# Sensitive terms that must NEVER be combined with public prefixes
+SENSITIVE_KEYWORD_REGEX = re.compile(
+    r"(?:OPENAI|ANTHROPIC|CLAUDE|GEMINI|AWS|SECRET|PRIVATE|TOKEN|PASSWORD|API_KEY|SERVICE_ROLE|BACKEND)",
+    re.IGNORECASE
+)
+
+# Patterns for dangerous code patterns and references
+DANGEROUS_CODE_PATTERNS = [
+    {
+        "id": "env_fallback_leak",
+        "name": "Hardcoded Secret Fallback in Environment Lookup",
+        "pattern": re.compile(
+            r"""(?:process\.env\.[A-Z0-9_]+|os\.(?:getenv|environ\.get)\s*\(['"][A-Z0-9_]+['"]\))\s*(?:\|\||\?\?|,)\s*['"]([a-zA-Z0-9_\-/.+=]{16,})['"]"""
+        ),
+        "severity": "CRITICAL",
+        "description": "Environment variable lookup has a hardcoded secret fallback value.",
+        "suggestion": "Remove the hardcoded default value and require the environment variable at runtime.",
+    },
+    {
+        "id": "url_embedded_credentials",
+        "name": "Embedded Credentials in URL",
+        "pattern": re.compile(
+            r"""https?://([a-zA-Z0-9_.-]+:[^@\s/]+)@[a-zA-Z0-9_.-]+"""
+        ),
+        "severity": "CRITICAL",
+        "description": "URL contains basic-auth username:password or token embedded directly.",
+        "suggestion": "Use authorization headers (e.g. 'Authorization: Bearer <token>') instead of URL credentials.",
+    },
+    {
+        "id": "url_query_secret",
+        "name": "API Key / Secret in URL Query String",
+        "pattern": re.compile(
+            r"""(?i)https?://[^\s'"?]+\?[^\s'"]*(?:api[_-]?key|key|secret|token|access[_-]?token)=([a-zA-Z0-9_\-]{16,})"""
+        ),
+        "severity": "CRITICAL",
+        "description": "API Key is hardcoded inside URL query parameters.",
+        "suggestion": "Pass API keys via HTTP headers, or load the key dynamically from environment variables.",
+    },
+    {
+        "id": "console_log_secret",
+        "name": "Logging Secret / Credential to Output",
+        "pattern": re.compile(
+            r"""(?i)(?:console\.log|print|logger\.(?:info|debug|warn|error))\s*\([^)]*\b(process\.env\.[A-Z0-9_]*(?:KEY|SECRET|TOKEN|AUTH|PASS)[A-Z0-9_]*|api[_-]?key|secret[_-]?key|auth[_-]?token)\b[^)]*\)"""
+        ),
+        "severity": "HIGH",
+        "description": "Secret or sensitive environment variable is being logged to console/logger.",
+        "suggestion": "Remove log statements that print secret values to prevent leaks in logs, CI, or APM.",
+    },
+    {
+        "id": "docker_hardcoded_env",
+        "name": "Hardcoded Secret in Docker ENV/ARG Instruction",
+        "pattern": re.compile(
+            r"""(?i)^\s*(?:ENV|ARG)\s+[A-Z0-9_]*(?:KEY|SECRET|TOKEN|AUTH|PASSWORD)[A-Z0-9_]*\s*=\s*['"]?([a-zA-Z0-9_\-]{16,})['"]?"""
+        ),
+        "severity": "CRITICAL",
+        "description": "Secret value is hardcoded in Dockerfile ENV or ARG instruction.",
+        "suggestion": "Use Docker BuildKit secrets (--secret) or pass secrets at runtime instead of bake-in.",
+    },
+]

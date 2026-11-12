@@ -36,5 +36,9 @@ hide-the-key --ci --json
 ## Protocol for Autonomous Agents
 
 1. **Gatekeeping**: Never push to remote (`git push`) if `hide-the-key` exits with code 1.
-2. **Environment Variables**: When an agent detects a `HARDCODED_KEY` issue, refactor the code to read from `os.environ` / `process.env` and place the real value in `.env` (which must be in `.gitignore`).
+2. **Environment Variables**:
+   - When an agent detects a `HARDCODED_KEY` issue, refactor the code to read from `os.environ` / `process.env` and place the real value in `.env` (which must be in `.gitignore`).
+   - **Frontend Danger**: NEVER prefix backend secrets with `NEXT_PUBLIC_`, `VITE_`, or `REACT_APP_`. These prefixes expose the secret to client-side browser bundles.
+   - **No Hardcoded Fallbacks**: Never write `process.env.KEY || 'raw_key'` or `os.getenv('KEY', 'raw_key')`. Require environment variables explicitly.
+   - **No Secret Logging**: Never `console.log(process.env.SECRET_KEY)` or `print(api_key)` in code.
 3. **Commit History Scrubbing**: If `hide-the-key --history` reports a committed secret, alert the user immediately to rotate the compromised credential.

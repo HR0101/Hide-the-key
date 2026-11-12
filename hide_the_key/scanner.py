@@ -22,6 +22,7 @@ from .secret_detector import (
     scan_diff_for_secrets,
     is_safe_filename,
 )
+from .code_pattern_detector import scan_file_for_code_patterns
 
 
 class FileIssue:
@@ -266,6 +267,31 @@ def scan_directory(
                             suggestion="Move the secret to an environment variable (.env) and read it via os.environ / process.env.",
                         )
                     )
+
+            # (D) Scan for Dangerous Code Patterns (e.g. NEXT_PUBLIC_ exposure, fallbacks, logging secrets)
+            pattern_findings = scan_file_for_code_patterns(full_path)
+            for pf in pattern_findings:
+                severity = pf["severity"]
+                git_note = ""
+                if summary.is_git:
+                    git_status = get_git_status_info(git_root, rel_to_repo)
+                    if git_status["is_ignored"]:
+                        severity = "LOW"
+                        git_note = " (Note: File is currently ignored by .gitignore)"
+                    elif git_status["is_tracked"]:
+                        severity = "CRITICAL"
+                        git_note = " (CRITICAL: File is tracked in git!)"
+
+                summary.add_issue(
+                    FileIssue(
+                        file_path=full_path,
+                        issue_type=pf["pattern_id"].upper(),
+                        severity=severity,
+                        message=f"{pf['message']}{git_note}",
+                        details=pf,
+                        suggestion=pf["suggestion"],
+                    )
+                )
 
     # 2. Check staged diff for secrets if inside git repo
     if summary.is_git and check_staged:
